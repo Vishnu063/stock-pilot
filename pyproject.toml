@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "stock-pilot"
-version = "0.2.0"
+version = "0.3.0"
 description = "Five-role stock research manager with deterministic paper-trading protection"
 requires-python = ">=3.11"
 dependencies = []
 
 [project.optional-dependencies]
-research = ["tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git@e8f5503e9b86d5c2710b0c76b1f686703968c9df"]
+research = ["httpx[socks]>=0.28,<1", "tradingagents @ git+https://github.com/TauricResearch/TradingAgents.git@e8f5503e9b86d5c2710b0c76b1f686703968c9df"]
+market = ["yfinance>=0.2.65,<2"]
 reports = ["quantstats>=0.0.77,<1"]
 
 [project.scripts]

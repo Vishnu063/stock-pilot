@@ -1,7 +1,7 @@
 # Stock Pilot
 
 Five roles working toward evidence-based stock research and controlled automation.
-**v0.2 is a research and local paper-trading system. It cannot place live orders.**
+**v0.3 is a research and local paper-trading system. It cannot place live orders.**
 Profit is an objective, never a promise. Stops can lose more than their planned amount during price gaps.
 
 ## Start in one command
@@ -39,7 +39,7 @@ Commands below also work as `python -m stock_pilot.cli ...` without installing t
 | 4. Manager | Conversational command router for portfolio, saved research, pause and resume |
 | 5. Investment analyst | Compares saved analyst ratings, dates and citation presence alongside protection objections |
 
-These are five application roles, not five newly trained models. Research roles share one upstream graph run. The protection role uses deterministic code. The Manager understands a small, explicit vocabulary of conversational requests; unrestricted model-based conversation is pending.
+These are five application roles, not five newly trained models. Research roles share one upstream graph run. The protection role uses deterministic code. The Manager supports explicit conversational actions plus optional read-only local-model explanations. Model text never executes actions.
 
 ## Research with a local model
 
@@ -98,7 +98,7 @@ stock-pilot pause
 stock-pilot resume
 ```
 
-Pause blocks new entries. Protection remains active **when you supply paper ticks**. The `watch` command continuously checks a quote-feed file while its process is running (see below). It does not fetch quotes from an exchange itself. Stops are local simulated rules, not broker-hosted stop orders. Daily loss rules block new entries; they do not liquidate every holding.
+Pause blocks new entries. Protection remains active **when you supply paper ticks**. The `watch` command continuously checks a quote-feed file while its process is running (see below). It can read an external feed or refresh public Yahoo data with `--source yahoo` (see above). Stops are local simulated rules, not broker-hosted stop orders. Daily loss rules block new entries; they do not liquidate every holding.
 
 ## Talk to your Manager
 
@@ -108,6 +108,14 @@ stock-pilot chat "review my portfolio"
 stock-pilot chat "pause trading"
 stock-pilot chat "why RELIANCE.NS"
 ```
+
+For broader explanations using your installed Ollama model:
+
+```bash
+stock-pilot chat --model qwen3:4b
+```
+
+The AI sees a bounded snapshot of paper holdings and up to three recent saved JSON reports. It has no execution tools, keeps only a short in-memory conversation, and can be wrong. Exact supported pause/resume commands remain deterministic. If Ollama fails, those commands still work.
 
 In the interactive chat, type `help` for supported requests and `exit` to leave. Unrecognized instructions do nothing. The Manager never infers a buy or sell order from a chat message. It can show saved reports and explain their dates and ratings; their financial claims remain upstream-generated.
 
@@ -122,6 +130,18 @@ stock-pilot compare reports/reliance.json reports/tcs.json --date 2026-10-19
 ```
 
 Use the desired analysis date for all three commands. The comparison orders Buy, Overweight, Hold, Underweight and Sell ratings; equal ratings use alphabetical order. **This is an opinion ranking, not evidence that the first stock will perform best.** Reports must share the requested analysis date, have been generated within 24 hours, contain core reports and include source URLs in news and fundamentals sections. Missing data and local protection objections move a stock to `needs_review`. URL presence does not verify the article, its publication date, or the underlying claim. Historical comparisons stay research-only.
+
+## Automatic paper-market data
+
+```bash
+python -m pip install -e '.[market]'
+stock-pilot collect RELIANCE.NS TCS.NS
+stock-pilot watch --source yahoo --interval 30
+```
+
+`collect` writes `reports/quotes.json`. The Yahoo watcher refreshes quotes for currently held paper positions each cycle, then runs protection checks. It supports `.NS` / `.BO` symbols and verifies the returned symbol and INR currency. Quote price and time come from matching Yahoo metadata; fetch time is stored separately and never used to make an old price appear fresh. Feed writes are atomic.
+
+Public Yahoo data can be delayed, unavailable, rate-limited or closed-market. It is not an execution-grade feed. Outside market hours, the most recent market timestamp will normally fail the quote-age check. A delayed quote pauses new paper entries rather than generating a fictitious timely exit. Collection errors are shown separately. Do not widen freshness limits just to make stale prices pass.
 
 ## Continuous paper protection
 
@@ -167,6 +187,14 @@ stock-pilot report examples/net_returns.csv --output reports/performance.html
 
 The sample CSV is fabricated. Supply sorted, unique dates and decimal periodic returns (`0.01` means 1%), already net of actual fees and slippage. Optional `benchmark` contains benchmark returns on the same dates. The ledger does not yet produce a time-series equity curve automatically.
 
+## Installation health check
+
+```bash
+stock-pilot doctor
+```
+
+This checks Python, optional modules and local Ollama availability/model names. It does not download anything, expose API keys, or declare a market feed validated merely because a package is installed.
+
 ## Verification
 
 ```bash
@@ -179,8 +207,8 @@ Tests cover gap losses, stop/trailing exits, fees, daily entry blocking, duplica
 
 - Validate upstream installation, local-model tool calling, and Indian company/news coverage on the target server.
 - Verify sources and publication times independently; keep unverified research out of actionable recommendations.
-- Expand Manager understanding beyond the supported conversational requests; add investment timeframes and suitability inputs.
-- Connect a verified live quote provider to the paper monitor; add proper net equity history and sector concentration limits.
+- Validate local-model answers on the target server; add investment timeframes and suitability inputs.
+- Validate Yahoo availability/delay during market hours or connect a broker data source; add net equity history and sector concentration limits.
 - Backtest on unseen data with Indian costs, then test broker sandbox execution including partial fills and reconnects.
 - Only after broker selection, explicit limits, authorization and validation: implement live execution, broker-side protection and reconciliation.
 

@@ -32,13 +32,34 @@ def monitor_cycle(broker, feed_path):
             'mode': 'local_paper', 'note': 'No broker orders; invalid feeds pause entries, never invent exit fills'}
 
 
-def watch(broker, feed_path, interval=5, cycles=None, emit=print):
+def watch(broker, feed_path, interval=5, cycles=None, emit=print, source="file"):
+    if source not in ("file", "yahoo"):
+        raise ValueError("Unsupported quote source")
+    if source == "yahoo" and interval < 30:
+        raise ValueError("Yahoo polling requires an interval of at least 30 seconds")
     if interval < 1 or (cycles is not None and cycles < 1):
         raise ValueError('Interval and cycles must be positive (interval at least one second)')
     count = 0
     try:
         while cycles is None or count < cycles:
+            collection_errors = []
+            if source == "yahoo":
+                from .market import collect, write_feed
+                symbols = [p["symbol"] for p in broker.status()["positions"]]
+                quotes, collection_errors = collect(symbols)
+                try:
+                    write_feed(feed_path, quotes)
+                except OSError as exc:
+                    broker.pause(True)
+                    emit(json.dumps({"events": [], "errors": ["Cannot save quote feed"],
+                                     "error_type": type(exc).__name__, "entries_paused": True}))
+                    count += 1
+                    if cycles is None or count < cycles:
+                        time.sleep(interval)
+                    continue
             result = monitor_cycle(broker, feed_path)
+            if collection_errors:
+                result["collection_errors"] = collection_errors
             emit(json.dumps(result))
             count += 1
             if cycles is None or count < cycles:

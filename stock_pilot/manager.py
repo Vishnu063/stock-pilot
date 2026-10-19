@@ -88,8 +88,9 @@ def compare(paths, as_of, broker):
 
 
 class Manager:
-    def __init__(self, broker, reports_dir='reports'):
+    def __init__(self, broker, reports_dir='reports', model=None):
         self.broker, self.reports_dir = broker, Path(reports_dir)
+        self.model, self.history = model, []
 
     def reply(self, message):
         text = ' '.join(message.lower().strip().split()).rstrip('.!?')
@@ -121,4 +122,21 @@ class Manager:
                 report = max(matches, key=lambda r: str(r.get('generated_at', '')))
                 return {'manager': 'Latest saved research; verify its date and sources before acting.', 'report': report}
             return {'manager': f'No saved research for {symbol}. Run the research command first.'}
+        if self.model:
+            from .chat import explain
+            saved = []
+            for path in sorted(self.reports_dir.glob('*.json'), key=lambda p: p.stat().st_mtime, reverse=True)[:3]:
+                try:
+                    saved.append(json.loads(path.read_text(encoding='utf-8')))
+                except (OSError, ValueError):
+                    continue
+            try:
+                answer = explain(message, self.broker.status(), saved, self.model, self.history)
+                self.history.extend([{'role': 'user', 'content': message},
+                                     {'role': 'assistant', 'content': answer['manager']}])
+                self.history = self.history[-6:]
+                return answer
+            except Exception as exc:
+                return {'manager': 'Local AI is unavailable. Explicit portfolio, pause and resume commands still work.',
+                        'error_type': type(exc).__name__, 'execution_allowed': False}
         return {'manager': 'I have not changed anything. Type help for supported requests.', 'execution_allowed': False}

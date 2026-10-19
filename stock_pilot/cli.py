@@ -30,14 +30,20 @@ def main(argv=None):
     r = sub.add_parser("chat")
     r.add_argument("message", nargs="?")
     r.add_argument("--reports-dir", default="reports")
+    r.add_argument("--model", help="Enable read-only explanations with an installed local Ollama model")
     r = sub.add_parser("compare")
     r.add_argument("reports", nargs="+")
     r.add_argument("--date", required=True)
     r.add_argument("--output", default="reports/comparison.json")
     r = sub.add_parser("watch")
-    r.add_argument("--feed", required=True)
+    r.add_argument("--feed", default="reports/quotes.json")
+    r.add_argument("--source", choices=["file", "yahoo"], default="file")
     r.add_argument("--interval", type=float, default=5)
     r.add_argument("--cycles", type=int)
+    r = sub.add_parser("collect")
+    r.add_argument("symbols", nargs="+")
+    r.add_argument("--output", default="reports/quotes.json")
+    r = sub.add_parser("doctor")
     r = sub.add_parser("research")
     r.add_argument("symbol")
     r.add_argument("--date", required=True, help="YYYY-MM-DD analysis date")
@@ -62,6 +68,17 @@ def main(argv=None):
             result=demo()
         elif args.command == "team":
             result=ROLES
+        elif args.command == "doctor":
+            from .doctor import diagnose
+            result = diagnose()
+        elif args.command == "collect":
+            from .market import collect, write_feed
+            quotes, errors = collect(args.symbols)
+            write_feed(args.output, quotes)
+            result = {"quotes": quotes, "errors": errors, "output": args.output, "mode": "paper_data_only"}
+            if not quotes:
+                print(json.dumps(result, indent=2))
+                return 1
         elif args.command == "openalgo-check":
             from .integrations import openalgo_status
             result=openalgo_status()
@@ -75,7 +92,7 @@ def main(argv=None):
             broker=PaperBroker(args.db,limits)
             if args.command == "chat":
                 from .manager import Manager
-                manager = Manager(broker, args.reports_dir)
+                manager = Manager(broker, args.reports_dir, args.model)
                 if args.message:
                     result = manager.reply(args.message)
                 else:
@@ -96,7 +113,7 @@ def main(argv=None):
                 Path(args.output).write_text(json.dumps(result, indent=2), encoding="utf-8")
             elif args.command == "watch":
                 from .monitor import watch
-                result = watch(broker, args.feed, args.interval, args.cycles)
+                result = watch(broker, args.feed, args.interval, args.cycles, source=args.source)
             elif args.command == "status":
                 result=broker.status()
             elif args.command in ("pause","resume"):
