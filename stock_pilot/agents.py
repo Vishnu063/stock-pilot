@@ -45,5 +45,5 @@ def investment_review(report, status, limits):
         blocked.append("Incomplete or unrecognized research")
     return {"research_rating":report.get("rating", "REVIEW"), "protection_objections":blocked,
             "manager_verdict":"REVIEW" if blocked else "RESEARCH_ONLY",
-            "note":"No ranking across stocks, suitability assessment, or automatic purchase in v0.1",
+            "note":"Ordinal research comparison available separately; no suitability assessment or automatic purchase",
             "next":"Review source evidence, timeframe, current quote, quantity and stop before any paper entry"}

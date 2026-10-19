@@ -38,15 +38,19 @@ class Limits:
     max_quote_age_seconds: int = 60
     slippage_bps: Decimal = Decimal("10")
     fee_per_order: Decimal = Decimal("0")
+    max_total_exposure: Decimal = Decimal("50000")
+    max_open_positions: int = 5
 
     def __post_init__(self):
-        for name in ("max_position_value", "max_trade_loss", "daily_loss_limit"):
+        for name in ("max_position_value", "max_trade_loss", "daily_loss_limit", "max_total_exposure"):
             object.__setattr__(self, name, positive(getattr(self, name)))
         for name in ("slippage_bps", "fee_per_order"):
             value = money(getattr(self, name))
             if value < 0 or (name == "slippage_bps" and value >= 10000):
                 raise ValueError("Invalid fee or slippage")
             object.__setattr__(self, name, value)
+        if type(self.max_open_positions) is not int or self.max_open_positions < 1:
+            raise ValueError("Maximum open positions must be positive")
         if type(self.max_quote_age_seconds) is not int or self.max_quote_age_seconds <= 0:
             raise ValueError("Quote age must be positive whole seconds")
 

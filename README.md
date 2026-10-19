@@ -1,7 +1,7 @@
 # Stock Pilot
 
 Five roles working toward evidence-based stock research and controlled automation.
-**v0.1 is a research and local paper-trading foundation. It cannot place live orders.**
+**v0.2 is a research and local paper-trading system. It cannot place live orders.**
 Profit is an objective, never a promise. Stops can lose more than their planned amount during price gaps.
 
 ## Start in one command
@@ -36,10 +36,10 @@ Commands below also work as `python -m stock_pilot.cli ...` without installing t
 | 1. Strategy | Reuses TradingAgents market analysis and trader proposal |
 | 2. Capital protection | Fixed entry limits, stop-loss and trailing-stop checks in the local paper ledger |
 | 3. Research | Reuses TradingAgents news and fundamentals analysts |
-| 4. Manager | Command interface for reports, portfolio status, pause and resume |
-| 5. Investment analyst | Combines upstream assessment with local protection objections; flags missing reports |
+| 4. Manager | Conversational command router for portfolio, saved research, pause and resume |
+| 5. Investment analyst | Compares saved analyst ratings, dates and citation presence alongside protection objections |
 
-These are five application roles, not five newly trained models. Research roles share one upstream graph run. The protection role uses deterministic code. The Manager currently supports explicit commands; free-form conversation is pending.
+These are five application roles, not five newly trained models. Research roles share one upstream graph run. The protection role uses deterministic code. The Manager understands a small, explicit vocabulary of conversational requests; unrestricted model-based conversation is pending.
 
 ## Research with a local model
 
@@ -57,7 +57,7 @@ Replace the date with your intended analysis date (YYYY-MM-DD, not in the future
 
 `examples/research.ollama.json` selects a local endpoint and India-oriented news queries. Adjust model names to your machine. Local AI has RAM and compute costs and may be slow; model quality and Indian-market coverage need validation. Upstream has substantial dependencies. Base demo installation does not install them.
 
-The output is saved to `reports/research.json` with analysis date, generation time, original reports, research rating, missing-report flags, and local risk objections. Citations remain inside upstream reports. **Citation completeness, factual correctness, news coverage and price freshness are not independently verified by this version.** An empty report forces REVIEW; a nonempty report is not proof of adequate evidence. No recommendation automatically buys a stock. No cross-stock ranking is implemented yet.
+The output is saved to `reports/research.json` with analysis date, generation time, original reports, research rating, missing-report flags, and local risk objections. Citations remain inside upstream reports. **Citation completeness, factual correctness, news coverage and price freshness are not independently verified by this version.** An empty report forces REVIEW; a nonempty report is not proof of adequate evidence. No recommendation automatically buys a stock. The separate comparison command ranks analyst opinions; it does not forecast returns.
 
 ## Local paper protection
 
@@ -98,7 +98,50 @@ stock-pilot pause
 stock-pilot resume
 ```
 
-Pause blocks new entries. Protection remains active **when you supply paper ticks**. This version has no continuous market watcher or background automation. Stops are local simulated rules, not broker-hosted stop orders. Daily loss rules block new entries; they do not liquidate every holding.
+Pause blocks new entries. Protection remains active **when you supply paper ticks**. The `watch` command continuously checks a quote-feed file while its process is running (see below). It does not fetch quotes from an exchange itself. Stops are local simulated rules, not broker-hosted stop orders. Daily loss rules block new entries; they do not liquidate every holding.
+
+## Talk to your Manager
+
+```bash
+stock-pilot chat
+stock-pilot chat "review my portfolio"
+stock-pilot chat "pause trading"
+stock-pilot chat "why RELIANCE.NS"
+```
+
+In the interactive chat, type `help` for supported requests and `exit` to leave. Unrecognized instructions do nothing. The Manager never infers a buy or sell order from a chat message. It can show saved reports and explain their dates and ratings; their financial claims remain upstream-generated.
+
+## Compare stocks
+
+Save individual research results to separate files:
+
+```bash
+stock-pilot research RELIANCE.NS --date 2026-10-19 --output reports/reliance.json
+stock-pilot research TCS.NS --date 2026-10-19 --output reports/tcs.json
+stock-pilot compare reports/reliance.json reports/tcs.json --date 2026-10-19
+```
+
+Use the desired analysis date for all three commands. The comparison orders Buy, Overweight, Hold, Underweight and Sell ratings; equal ratings use alphabetical order. **This is an opinion ranking, not evidence that the first stock will perform best.** Reports must share the requested analysis date, have been generated within 24 hours, contain core reports and include source URLs in news and fundamentals sections. Missing data and local protection objections move a stock to `needs_review`. URL presence does not verify the article, its publication date, or the underlying claim. Historical comparisons stay research-only.
+
+## Continuous paper protection
+
+An external data collector must refresh a JSON file with real quote timestamps. The watcher never substitutes the current clock for an old quote. Example feed shape (values are fabricated):
+
+```json
+{
+  "RELIANCE.NS": {"price": "94", "timestamp": "2026-10-19T22:30:00+00:00"}
+}
+```
+
+Replace the timestamp with the real source quote time. Write updates to a temporary file and atomically rename it to `quotes.json`, so the watcher does not read a partially written file.
+
+```bash
+stock-pilot watch --feed quotes.json --interval 5
+```
+
+Run in a separate terminal from the Manager. It checks each held position, applies stop/trailing rules and stores simulated fills. `--cycles 1` runs one check and exits. Stale, missing, invalid or out-of-order held-position quotes pause new entries and report errors. Valid positions still receive protection checks while entries are paused. Resume is manual after the feed recovers. Monitoring ends if the process or machine stops; no broker-hosted protection exists in this version.
+
+New entries require fresh marks for all existing positions and also obey maximum open positions (default 5) and total marked exposure (default 50000). These can be set using `max_open_positions` and `max_total_exposure` in the limits JSON. They are demonstration defaults, not personalized allocation advice.
 
 ## OpenAlgo connection check
 
@@ -130,15 +173,15 @@ The sample CSV is fabricated. Supply sorted, unique dates and decimal periodic r
 python -m unittest discover -s tests -v
 ```
 
-Tests cover gap losses, stop/trailing exits, fees, daily entry blocking, duplicate actions, persistence, pause behavior, invalid and stale prices, out-of-order ticks, the upstream adapter contract, and OpenAlgo mode verification. Mocked integrations do not establish live compatibility.
+Tests cover gap losses, stop/trailing exits, fees, daily entry blocking, duplicate actions, persistence, pause behavior, invalid and stale prices, out-of-order ticks, continuous monitor cycles, re-entry identity, report comparison, Manager requests, portfolio exposure, the upstream adapter contract, and OpenAlgo mode verification. Mocked integrations do not establish live compatibility.
 
 ## Next implementation gates
 
 - Validate upstream installation, local-model tool calling, and Indian company/news coverage on the target server.
 - Verify sources and publication times independently; keep unverified research out of actionable recommendations.
-- Add a conversational Manager and watchlist ranking with user-defined investment timeframes.
-- Add continuous paper-data monitoring, portfolio-wide exposure limits, and proper net equity history.
+- Expand Manager understanding beyond the supported conversational requests; add investment timeframes and suitability inputs.
+- Connect a verified live quote provider to the paper monitor; add proper net equity history and sector concentration limits.
 - Backtest on unseen data with Indian costs, then test broker sandbox execution including partial fills and reconnects.
 - Only after broker selection, explicit limits, authorization and validation: implement live execution, broker-side protection and reconciliation.
 
-No real money was connected or traded while building v0.1.
+No real money was connected or traded while building these versions.

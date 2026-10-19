@@ -27,6 +27,17 @@ def main(argv=None):
     sub = parser.add_subparsers(dest="command", required=True)
     for cmd in ("demo","team","status","pause","resume","openalgo-check"):
         sub.add_parser(cmd)
+    r = sub.add_parser("chat")
+    r.add_argument("message", nargs="?")
+    r.add_argument("--reports-dir", default="reports")
+    r = sub.add_parser("compare")
+    r.add_argument("reports", nargs="+")
+    r.add_argument("--date", required=True)
+    r.add_argument("--output", default="reports/comparison.json")
+    r = sub.add_parser("watch")
+    r.add_argument("--feed", required=True)
+    r.add_argument("--interval", type=float, default=5)
+    r.add_argument("--cycles", type=int)
     r = sub.add_parser("research")
     r.add_argument("symbol")
     r.add_argument("--date", required=True, help="YYYY-MM-DD analysis date")
@@ -62,7 +73,31 @@ def main(argv=None):
             with open(args.limits) as f:
                 limits=Limits.load(json.load(f))
             broker=PaperBroker(args.db,limits)
-            if args.command == "status":
+            if args.command == "chat":
+                from .manager import Manager
+                manager = Manager(broker, args.reports_dir)
+                if args.message:
+                    result = manager.reply(args.message)
+                else:
+                    print("Manager ready. Type help or exit.")
+                    while True:
+                        try:
+                            message = input("You: ")
+                        except (EOFError, KeyboardInterrupt):
+                            break
+                        if message.strip().lower() in ("exit", "quit"):
+                            break
+                        print(json.dumps(manager.reply(message), indent=2))
+                    result = {"manager": "Chat closed; any separate watcher keeps running."}
+            elif args.command == "compare":
+                from .manager import compare
+                result = compare(args.reports, args.date, broker)
+                Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+                Path(args.output).write_text(json.dumps(result, indent=2), encoding="utf-8")
+            elif args.command == "watch":
+                from .monitor import watch
+                result = watch(broker, args.feed, args.interval, args.cycles)
+            elif args.command == "status":
                 result=broker.status()
             elif args.command in ("pause","resume"):
                 result=broker.pause(args.command == "pause")

@@ -1,6 +1,7 @@
 """Persistent, long-only simulator. Never submits broker orders."""
 import json
 import sqlite3
+from uuid import uuid4
 from contextlib import contextmanager
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -22,6 +23,10 @@ class PaperBroker:
         CREATE TABLE IF NOT EXISTS positions(symbol TEXT PRIMARY KEY, quantity INTEGER NOT NULL, entry TEXT NOT NULL, stop TEXT NOT NULL, high TEXT NOT NULL, trailing_pct TEXT, last TEXT NOT NULL, entry_fee TEXT NOT NULL, last_ts TEXT NOT NULL);
         CREATE TABLE IF NOT EXISTS events(id INTEGER PRIMARY KEY, request_id TEXT UNIQUE, timestamp TEXT NOT NULL, day TEXT NOT NULL, kind TEXT NOT NULL, payload TEXT NOT NULL, pnl TEXT NOT NULL);
         """)
+        if "position_id" not in {row[1] for row in self.db.execute("PRAGMA table_info(positions)")}:
+            self.db.execute("ALTER TABLE positions ADD COLUMN position_id TEXT NOT NULL DEFAULT ''")
+        for row in self.db.execute("SELECT symbol FROM positions WHERE position_id='' ").fetchall():
+            self.db.execute("UPDATE positions SET position_id=? WHERE symbol=?", (str(uuid4()), row[0]))
         self.db.execute("INSERT OR IGNORE INTO account(id,cash) VALUES(1,?)", (str(positive(starting_cash)),))
 
     @contextmanager
@@ -71,11 +76,18 @@ class PaperBroker:
                 raise ValueError("Position already exists; averaging down is disabled")
             if trailing_pct is not None and not (0 < positive(trailing_pct) < 100):
                 raise ValueError("Trailing percentage must be between 0 and 100")
+            if len(status["positions"]) >= self.limits.max_open_positions:
+                raise ValueError("Maximum open positions reached")
+            for position in status["positions"]:
+                self.limits.quote(position["last"], position["last_ts"])
+            exposure = sum((money(p["last"]) * p["quantity"] for p in status["positions"]), Decimal(0))
+            if exposure + price * qty > self.limits.max_total_exposure:
+                raise ValueError("Maximum total exposure exceeded")
             self.limits.entry(price, qty, stop, money(status["loss_guard_pnl"]), money(status["cash"]))
             cost = price * qty + self.limits.fee_per_order
             self.db.execute("UPDATE account SET cash=? WHERE id=1", (str(money(status["cash"])-cost),))
-            self.db.execute("INSERT INTO positions VALUES(?,?,?,?,?,?,?,?,?)", (symbol, qty, str(price), str(positive(stop)), str(price),
-                str(trailing_pct) if trailing_pct is not None else None, str(price), str(self.limits.fee_per_order), timestamp))
+            self.db.execute("INSERT INTO positions VALUES(?,?,?,?,?,?,?,?,?,?)", (symbol, qty, str(price), str(positive(stop)), str(price),
+                str(trailing_pct) if trailing_pct is not None else None, str(price), str(self.limits.fee_per_order), timestamp, str(uuid4())))
             result = {"symbol": symbol, "side": "BUY", "quantity": qty, "fill": str(price), "mode": "local_paper"}
             self.event("BUY", result, request_id, -self.limits.fee_per_order)
             return result
@@ -110,6 +122,8 @@ class PaperBroker:
 
     def pause(self, paused):
         with self.transaction():
-            self.db.execute("UPDATE account SET paused=? WHERE id=1", (int(paused),))
-            self.event("PAUSE" if paused else "RESUME", {"paused":paused})
+            current = bool(self.db.execute("SELECT paused FROM account WHERE id=1").fetchone()[0])
+            if current != paused:
+                self.db.execute("UPDATE account SET paused=? WHERE id=1", (int(paused),))
+                self.event("PAUSE" if paused else "RESUME", {"paused":paused})
         return {"paused":paused,"note":"Protection checks still run when ticks are supplied"}
