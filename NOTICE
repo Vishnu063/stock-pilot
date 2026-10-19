@@ -1,0 +1,5 @@
+Stock Pilot integrates independent open-source projects as dependencies/services:
+TradingAgents — Tauric Research — Apache-2.0 (pinned in pyproject.toml).
+OpenAlgo — marketcalls — separately installed service; no source bundled.
+QuantStats — Ran Aroussi — optional analytics dependency; no source bundled.
+Consult each upstream repository for its current license and service/data requirements.

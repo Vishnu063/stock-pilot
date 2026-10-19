@@ -1,0 +1,14 @@
+{
+  "llm_provider": "ollama",
+  "backend_url": "http://localhost:11434/v1",
+  "quick_think_llm": "qwen3:4b",
+  "deep_think_llm": "qwen3:4b",
+  "max_debate_rounds": 1,
+  "max_risk_discuss_rounds": 1,
+  "max_tool_rounds": 5,
+  "global_news_queries": [
+    "India RBI interest rates inflation",
+    "NSE BSE corporate earnings announcements",
+    "India oil prices rupee geopolitical risk"
+  ]
+}

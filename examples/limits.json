@@ -1,0 +1,8 @@
+{
+  "max_position_value": "10000",
+  "max_trade_loss": "200",
+  "daily_loss_limit": "500",
+  "max_quote_age_seconds": 60,
+  "slippage_bps": "10",
+  "fee_per_order": "2"
+}
