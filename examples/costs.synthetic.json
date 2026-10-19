@@ -1,0 +1,32 @@
+{
+  "name": "SYNTHETIC TEST RATES \u2014 NOT A BROKER TARIFF",
+  "reviewed": false,
+  "effective_from": "2020-01-01",
+  "effective_until": "2030-01-01",
+  "charges": [
+    {
+      "name": "brokerage",
+      "rate_bps": "3",
+      "cap": "20",
+      "gst_pct": "18"
+    },
+    {
+      "name": "test_tax",
+      "side": "SELL",
+      "rate_bps": "10",
+      "round_to": "1"
+    },
+    {
+      "name": "test_stamp",
+      "side": "BUY",
+      "rate_bps": "1.5"
+    },
+    {
+      "name": "test_dp",
+      "side": "SELL",
+      "fixed": "5",
+      "gst_pct": "18"
+    }
+  ],
+  "warning": "Arithmetic demonstration only. Replace with a verified, effective-dated broker tariff before assessing trades."
+}

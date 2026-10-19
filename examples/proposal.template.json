@@ -1,0 +1,16 @@
+{
+  "symbol": "EXAMPLE.NS",
+  "quantity": 1,
+  "stop": "95",
+  "target": "120",
+  "holding_days": 30,
+  "quote": {
+    "price": "100",
+    "timestamp": "REPLACE_WITH_SOURCE_ISO_TIMESTAMP",
+    "currency": "INR",
+    "source": "REPLACE_WITH_REVIEWED_QUOTE_PROVIDER"
+  },
+  "average_daily_turnover": "10000000",
+  "spread_bps": "5",
+  "warning": "All numbers are synthetic examples, not personal trading recommendations."
+}

@@ -1,4 +1,5 @@
 """Manager command interface. Offline demo requires no API keys or packages."""
+
 import argparse
 import json
 import sys
@@ -11,26 +12,37 @@ from .risk import Limits
 
 def demo():
     limits = Limits("10000", "200", "500", fee_per_order="2")
-    broker = PaperBroker(":memory:",limits)
+    broker = PaperBroker(":memory:", limits)
     now = datetime.now(timezone.utc).isoformat()
-    buy = broker.buy("DEMO",10,"100",now,"95","demo-entry", "3")
-    hold = broker.tick("DEMO","105",now,"demo-rise")
-    sell = broker.tick("DEMO","101",now,"demo-exit")
-    return {"manager":"Offline synthetic demonstration, not market research", "roles":ROLES,
-            "events":[buy,hold,sell],"portfolio":broker.status()}
+    buy = broker.buy("DEMO", 10, "100", now, "95", "demo-entry", "3")
+    hold = broker.tick("DEMO", "105", now, "demo-rise")
+    sell = broker.tick("DEMO", "101", now, "demo-exit")
+    return {
+        "manager": "Offline synthetic demonstration, not market research",
+        "roles": ROLES,
+        "events": [buy, hold, sell],
+        "portfolio": broker.status(),
+    }
 
 
 def main(argv=None):
-    parser = argparse.ArgumentParser(description="Stock Pilot Manager — research and local paper trading")
+    parser = argparse.ArgumentParser(
+        description="Stock Pilot Manager — research and local paper trading"
+    )
     parser.add_argument("--db", default="paper.db")
-    parser.add_argument("--limits",default="examples/limits.json")
+    parser.add_argument("--instruments", help="Reviewed sector/risk-group mapping JSON")
+    parser.add_argument("--costs", help="Reviewed itemized cost schedule JSON")
+    parser.add_argument("--limits", default="examples/limits.json")
     sub = parser.add_subparsers(dest="command", required=True)
-    for cmd in ("demo","team","status","pause","resume","openalgo-check"):
+    for cmd in ("demo", "team", "status", "pause", "resume", "openalgo-check"):
         sub.add_parser(cmd)
     r = sub.add_parser("chat")
     r.add_argument("message", nargs="?")
     r.add_argument("--reports-dir", default="reports")
-    r.add_argument("--model", help="Enable read-only explanations with an installed local Ollama model")
+    r.add_argument(
+        "--model",
+        help="Enable read-only explanations with an installed local Ollama model",
+    )
     r = sub.add_parser("compare")
     r.add_argument("reports", nargs="+")
     r.add_argument("--date", required=True)
@@ -43,55 +55,160 @@ def main(argv=None):
     r = sub.add_parser("collect")
     r.add_argument("symbols", nargs="+")
     r.add_argument("--output", default="reports/quotes.json")
+    r = sub.add_parser("attach-evidence")
+    r.add_argument("report")
+    r.add_argument("manifest")
+    r.add_argument("--output", required=True)
+    r = sub.add_parser("backtest")
+    r.add_argument("csv")
+    r.add_argument("--split-date", required=True)
+    r.add_argument(
+        "--benchmark",
+        help="Optional OHLC reference series CSV with matching holdout dates",
+    )
+    r.add_argument("--output", default="reports/backtest.json")
+    r = sub.add_parser("assess")
+    r.add_argument("report")
+    r.add_argument("proposal")
+    r = sub.add_parser("journal")
+    r.add_argument("--verify", action="store_true")
+    r.add_argument("--summary", action="store_true")
+    r = sub.add_parser("observe")
+    r.add_argument("decision_id")
+    r.add_argument("--price", required=True)
+    r.add_argument("--timestamp", required=True)
+    r.add_argument("--reason", required=True)
     r = sub.add_parser("doctor")
     r = sub.add_parser("research")
     r.add_argument("symbol")
     r.add_argument("--date", required=True, help="YYYY-MM-DD analysis date")
-    r.add_argument("--config",default="examples/research.ollama.json")
-    r.add_argument("--output",default="reports/research.json")
-    for cmd in ("paper-buy","paper-tick"):
-        p=sub.add_parser(cmd)
+    r.add_argument("--config", default="examples/research.ollama.json")
+    r.add_argument("--output", default="reports/research.json")
+    for cmd in ("paper-buy", "paper-tick"):
+        p = sub.add_parser(cmd)
         p.add_argument("symbol")
-        p.add_argument("--price",required=True)
-        p.add_argument("--timestamp",required=True,help="Quote time in ISO 8601 with timezone")
-        p.add_argument("--request-id",required=True)
+        p.add_argument("--price", required=True)
+        p.add_argument(
+            "--timestamp", required=True, help="Quote time in ISO 8601 with timezone"
+        )
+        p.add_argument("--request-id", required=True)
         if cmd == "paper-buy":
-            p.add_argument("--quantity",type=int,required=True)
-            p.add_argument("--stop",required=True)
+            p.add_argument("--quantity", type=int, required=True)
+            p.add_argument("--stop", required=True)
             p.add_argument("--trailing-pct")
-    r=sub.add_parser("report")
+    r = sub.add_parser("report")
     r.add_argument("csv")
-    r.add_argument("--output",default="reports/performance.html")
-    args=parser.parse_args(argv)
+    r.add_argument("--output", default="reports/performance.html")
+    args = parser.parse_args(argv)
     try:
         if args.command == "demo":
-            result=demo()
+            result = demo()
         elif args.command == "team":
-            result=ROLES
+            result = ROLES
+        elif args.command == "attach-evidence":
+            from .evidence import attach
+
+            result = attach(args.report, args.manifest, args.output)
         elif args.command == "doctor":
             from .doctor import diagnose
+
             result = diagnose()
         elif args.command == "collect":
             from .market import collect, write_feed
+
             quotes, errors = collect(args.symbols)
             write_feed(args.output, quotes)
-            result = {"quotes": quotes, "errors": errors, "output": args.output, "mode": "paper_data_only"}
+            result = {
+                "quotes": quotes,
+                "errors": errors,
+                "output": args.output,
+                "mode": "paper_data_only",
+            }
             if not quotes:
                 print(json.dumps(result, indent=2))
                 return 1
         elif args.command == "openalgo-check":
             from .integrations import openalgo_status
-            result=openalgo_status()
+
+            result = openalgo_status()
         elif args.command == "report":
             from .integrations import performance_report
-            Path(args.output).parent.mkdir(parents=True,exist_ok=True)
-            result=performance_report(args.csv,args.output)
+
+            Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+            result = performance_report(args.csv, args.output)
         else:
             with open(args.limits) as f:
-                limits=Limits.load(json.load(f))
-            broker=PaperBroker(args.db,limits)
-            if args.command == "chat":
+                limits = Limits.load(json.load(f))
+            schedule = None
+            if args.costs:
+                from .costs import CostSchedule
+
+                schedule = CostSchedule(json.loads(Path(args.costs).read_text()))
+            instruments = (
+                json.loads(Path(args.instruments).read_text())
+                if args.instruments
+                else None
+            )
+            broker = PaperBroker(
+                args.db, limits, cost_schedule=schedule, instruments=instruments
+            )
+            if args.command == "backtest":
+                if schedule is None:
+                    raise ValueError(
+                        "Backtesting requires an explicit itemized historical cost schedule"
+                    )
+                from .backtest import evaluate
+
+                result = evaluate(
+                    args.csv, schedule, args.split_date, benchmark_path=args.benchmark
+                )
+                Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+                Path(args.output).write_text(json.dumps(result, indent=2))
+                from .journal import append, entries
+
+                previous_runs = [
+                    r
+                    for r in entries(broker.db)
+                    if r["kind"] == "BACKTEST"
+                    and r["payload"].get("dataset_sha256") == result["dataset_sha256"]
+                ]
+                result["previous_runs_on_same_dataset"] = len(previous_runs)
+                if previous_runs:
+                    result["limitations"].append(
+                        "This dataset has been evaluated before; do not treat it as a fresh unseen holdout"
+                    )
+                Path(args.output).write_text(json.dumps(result, indent=2))
+                with broker.transaction():
+                    append(broker.db, "BACKTEST", result)
+            elif args.command == "assess":
+                from .decision import assess
+                from .journal import record_assessment
+
+                report = json.loads(Path(args.report).read_text())
+                proposal = json.loads(Path(args.proposal).read_text())
+                result = assess(report, proposal, broker)
+                result["decision_id"] = record_assessment(
+                    broker, report, proposal, result
+                )
+            elif args.command == "journal":
+                from .journal import entries, verify, summary
+
+                result = (
+                    verify(broker.db)
+                    if args.verify
+                    else summary(broker.db)
+                    if args.summary
+                    else entries(broker.db)
+                )
+            elif args.command == "observe":
+                from .journal import observe
+
+                result = observe(
+                    broker, args.decision_id, args.price, args.timestamp, args.reason
+                )
+            elif args.command == "chat":
                 from .manager import Manager
+
                 manager = Manager(broker, args.reports_dir, args.model)
                 if args.message:
                     result = manager.reply(args.message)
@@ -105,35 +222,60 @@ def main(argv=None):
                         if message.strip().lower() in ("exit", "quit"):
                             break
                         print(json.dumps(manager.reply(message), indent=2))
-                    result = {"manager": "Chat closed; any separate watcher keeps running."}
+                    result = {
+                        "manager": "Chat closed; any separate watcher keeps running."
+                    }
             elif args.command == "compare":
                 from .manager import compare
+
                 result = compare(args.reports, args.date, broker)
                 Path(args.output).parent.mkdir(parents=True, exist_ok=True)
-                Path(args.output).write_text(json.dumps(result, indent=2), encoding="utf-8")
+                Path(args.output).write_text(
+                    json.dumps(result, indent=2), encoding="utf-8"
+                )
             elif args.command == "watch":
                 from .monitor import watch
-                result = watch(broker, args.feed, args.interval, args.cycles, source=args.source)
+
+                result = watch(
+                    broker, args.feed, args.interval, args.cycles, source=args.source
+                )
             elif args.command == "status":
-                result=broker.status()
-            elif args.command in ("pause","resume"):
-                result=broker.pause(args.command == "pause")
+                result = broker.status()
+            elif args.command in ("pause", "resume"):
+                result = broker.pause(args.command == "pause")
             elif args.command == "paper-buy":
-                result=broker.buy(args.symbol,args.quantity,args.price,args.timestamp,args.stop,args.request_id,args.trailing_pct)
+                result = broker.buy(
+                    args.symbol,
+                    args.quantity,
+                    args.price,
+                    args.timestamp,
+                    args.stop,
+                    args.request_id,
+                    args.trailing_pct,
+                )
             elif args.command == "paper-tick":
-                result=broker.tick(args.symbol,args.price,args.timestamp,args.request_id)
+                result = broker.tick(
+                    args.symbol, args.price, args.timestamp, args.request_id
+                )
             else:
-                result=research(args.symbol,args.date,args.config)
-                result["investment_agent"]=investment_review(result,broker.status(),limits)
-                Path(args.output).parent.mkdir(parents=True,exist_ok=True)
-                Path(args.output).write_text(json.dumps(result,indent=2),encoding="utf-8")
-        print(json.dumps(result,indent=2))
+                result = research(args.symbol, args.date, args.config)
+                result["investment_agent"] = investment_review(
+                    result, broker.status(), limits
+                )
+                Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+                Path(args.output).write_text(
+                    json.dumps(result, indent=2), encoding="utf-8"
+                )
+        print(json.dumps(result, indent=2))
         return 0
     except Exception as exc:
         # Avoid printing HTTP bodies, which may contain credentials.
-        print(f"Manager stopped: {type(exc).__name__}: check configuration, data and service availability.",file=sys.stderr)
-        if isinstance(exc,(ValueError, FileNotFoundError, ModuleNotFoundError)):
-            print(str(exc),file=sys.stderr)
+        print(
+            f"Manager stopped: {type(exc).__name__}: check configuration, data and service availability.",
+            file=sys.stderr,
+        )
+        if isinstance(exc, (ValueError, FileNotFoundError, ModuleNotFoundError)):
+            print(str(exc), file=sys.stderr)
         return 1
 
 

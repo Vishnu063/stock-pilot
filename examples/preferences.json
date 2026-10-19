@@ -1,0 +1,10 @@
+{
+  "market": "India equities (current implementation scope)",
+  "holding_style": "days_to_months",
+  "server_ram_gb": 8,
+  "broker": null,
+  "model": "qwen3:4b",
+  "run_research_sequentially": true,
+  "live_trading_enabled": false,
+  "personal_capital_and_risk_limits": null
+}

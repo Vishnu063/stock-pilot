@@ -21,3 +21,12 @@ Installed test versions included yfinance 1.7.0, QuantStats 0.0.86 and TradingAg
 Tests exercise source timestamp preservation, wrong symbol/currency rejection, partial collection errors, atomic feed writes, automatic paper-monitor wiring, feed-write failure handling, and read-only local chat. Mocked success does not establish live vendor availability or model accuracy.
 
 No profitability, execution latency, target-server resource usage, source factual accuracy or trading suitability has been established by these checks.
+
+
+# v0.4 controls
+
+The sequential upgrades add local source integrity/date checks, configurable itemized costs, daily-bar chronological holdout testing, sector/group and persisted drawdown gates, no-trade assessment, and a local hash-linked journal. No previously failed market-data or model check is treated as resolved by these changes.
+
+The current suite passes 58 tests, including source tampering, future publications, domain spoofing, itemized fee/cash reconciliation, holdout isolation, prior-close signal timing, concentration/drawdown blocking, assessment non-execution, audit modification detection, counterfactual outcome labeling and v0.3 database migration.
+
+Recorded user constraints: days-to-months holding style, 8 GB target server and broker undecided. Capital and personal risk limits remain unset. No live orders are implemented.

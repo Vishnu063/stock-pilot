@@ -1,0 +1,18 @@
+[
+  {
+    "symbol": "EXAMPLE.NS",
+    "url": "https://www.nseindia.com/REPLACE_WITH_ACTUAL_DOCUMENT_URL",
+    "category": "news",
+    "file": "REPLACE_WITH_LOCAL_DOCUMENT_SNAPSHOT",
+    "published_at": "REPLACE_WITH_PUBLICATION_ISO_TIMESTAMP",
+    "captured_at": "REPLACE_WITH_CAPTURE_ISO_TIMESTAMP"
+  },
+  {
+    "symbol": "EXAMPLE.NS",
+    "url": "https://www.nseindia.com/REPLACE_WITH_ACTUAL_DOCUMENT_URL",
+    "category": "fundamentals",
+    "file": "REPLACE_WITH_LOCAL_DOCUMENT_SNAPSHOT",
+    "published_at": "REPLACE_WITH_PUBLICATION_ISO_TIMESTAMP",
+    "captured_at": "REPLACE_WITH_CAPTURE_ISO_TIMESTAMP"
+  }
+]

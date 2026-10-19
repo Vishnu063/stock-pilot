@@ -1,7 +1,7 @@
 # Stock Pilot
 
 Five roles working toward evidence-based stock research and controlled automation.
-**v0.3 is a research and local paper-trading system. It cannot place live orders.**
+**v0.4 is a research and local paper-trading system. It cannot place live orders.**
 Profit is an objective, never a promise. Stops can lose more than their planned amount during price gaps.
 
 ## Start in one command
@@ -73,7 +73,7 @@ Review `examples/limits.json` before testing. Its values are demo settings, not 
 | Assumed slippage | 10 basis points per fill |
 | Assumed fee | 2 per order |
 
-Fees are a simplified placeholder; Indian taxes, exchange charges and broker-specific charges are not modeled. Daily entry checks use today's realized P&L plus current marked open P&L. Positions are marked only when you supply a quote. Daily buckets use Asia/Kolkata. This is not a start-of-day equity drawdown model. Entries are long-only, one position per symbol, without averaging down or leverage.
+The default flat fee is a placeholder. An optional effective-dated itemized schedule models turnover charges, caps, fixed amounts and taxes on charges. Actual broker tariffs still need verification; see the research workflow below. Daily entry checks use today's realized P&L plus current marked open P&L. Positions are marked only when you supply a quote. Daily buckets use Asia/Kolkata. This is not a start-of-day equity drawdown model. Entries are long-only, one position per symbol, without averaging down or leverage.
 
 Supply a fresh, timezone-aware quote timestamp. In Bash:
 
@@ -129,7 +129,7 @@ stock-pilot research TCS.NS --date 2026-10-19 --output reports/tcs.json
 stock-pilot compare reports/reliance.json reports/tcs.json --date 2026-10-19
 ```
 
-Use the desired analysis date for all three commands. The comparison orders Buy, Overweight, Hold, Underweight and Sell ratings; equal ratings use alphabetical order. **This is an opinion ranking, not evidence that the first stock will perform best.** Reports must share the requested analysis date, have been generated within 24 hours, contain core reports and include source URLs in news and fundamentals sections. Missing data and local protection objections move a stock to `needs_review`. URL presence does not verify the article, its publication date, or the underlying claim. Historical comparisons stay research-only.
+Use the desired analysis date for all three commands. The comparison orders Buy, Overweight, Hold, Underweight and Sell ratings; equal ratings use alphabetical order. **This is an opinion ranking, not evidence that the first stock will perform best.** Reports must share the requested analysis date, have been generated within 24 hours, contain core reports, cite their source URLs and have dated, hash-checked snapshots attached. Financial evidence needs an allowed primary-domain source. Missing data and local protection objections move a stock to `needs_review`. URL presence does not verify the article, its publication date, or the underlying claim. Historical comparisons stay research-only.
 
 ## Automatic paper-market data
 
@@ -203,12 +203,18 @@ python -m unittest discover -s tests -v
 
 Tests cover gap losses, stop/trailing exits, fees, daily entry blocking, duplicate actions, persistence, pause behavior, invalid and stale prices, out-of-order ticks, continuous monitor cycles, re-entry identity, report comparison, Manager requests, portfolio exposure, the upstream adapter contract, and OpenAlgo mode verification. Mocked integrations do not establish live compatibility.
 
+## Research and decision controls
+
+v0.4 adds source snapshots, itemized costs, chronological holdout evaluation, sector/related-holdings caps, persisted marked-equity drawdown checks, deterministic `NO_TRADE` assessments, and a local decision/outcome journal.
+
+Follow [the six-step research workflow](docs/RESEARCH_WORKFLOW.md) for commands, required inputs and limitations. Synthetic examples and passing tests do not establish a tradable edge.
+
 ## Next implementation gates
 
 - Validate upstream installation, local-model tool calling, and Indian company/news coverage on the target server.
 - Verify sources and publication times independently; keep unverified research out of actionable recommendations.
 - Validate local-model answers on the target server; add investment timeframes and suitability inputs.
-- Validate Yahoo availability/delay during market hours or connect a broker data source; add net equity history and sector concentration limits.
+- Validate Yahoo availability/delay during market hours or connect a broker data source; validate marked equity history and reviewed sector/group classifications.
 - Backtest on unseen data with Indian costs, then test broker sandbox execution including partial fills and reconnects.
 - Only after broker selection, explicit limits, authorization and validation: implement live execution, broker-side protection and reconciliation.
 
