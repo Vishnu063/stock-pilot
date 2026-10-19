@@ -1,0 +1,144 @@
+# Stock Pilot
+
+Five roles working toward evidence-based stock research and controlled automation.
+**v0.1 is a research and local paper-trading foundation. It cannot place live orders.**
+Profit is an objective, never a promise. Stops can lose more than their planned amount during price gaps.
+
+## Start in one command
+
+Python 3.11 or newer is required. No API key, GPU, or third-party package is needed for the offline demo.
+
+```bash
+git clone https://github.com/Vishnu063/stock-pilot.git
+cd stock-pilot
+python3 -m stock_pilot.cli demo
+```
+
+The synthetic demo buys DEMO, raises its price, and triggers a trailing-stop exit. It is not a backtest or evidence of profitability.
+
+For a short command after installation:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install -e .
+stock-pilot team
+stock-pilot status
+```
+
+On Windows, activate with `.venv\Scripts\Activate.ps1` in PowerShell.
+Commands below also work as `python -m stock_pilot.cli ...` without installing the base package.
+
+## Your five roles
+
+| Role | Implemented behavior |
+|---|---|
+| 1. Strategy | Reuses TradingAgents market analysis and trader proposal |
+| 2. Capital protection | Fixed entry limits, stop-loss and trailing-stop checks in the local paper ledger |
+| 3. Research | Reuses TradingAgents news and fundamentals analysts |
+| 4. Manager | Command interface for reports, portfolio status, pause and resume |
+| 5. Investment analyst | Combines upstream assessment with local protection objections; flags missing reports |
+
+These are five application roles, not five newly trained models. Research roles share one upstream graph run. The protection role uses deterministic code. The Manager currently supports explicit commands; free-form conversation is pending.
+
+## Research with a local model
+
+The research integration uses [TradingAgents](https://github.com/TauricResearch/TradingAgents) pinned at `e8f5503e9b86d5c2710b0c76b1f686703968c9df`. It is a dependency, not copied or claimed as our own code.
+
+Install [Ollama](https://ollama.com/) separately, start it, and download a tool-capable model:
+
+```bash
+ollama pull qwen3:4b
+python -m pip install -e '.[research]'
+stock-pilot research RELIANCE.NS --date 2026-10-19
+```
+
+Replace the date with your intended analysis date (YYYY-MM-DD, not in the future). `.NS` and `.BO` are Yahoo-style NSE/BSE research symbols; broker symbols may differ.
+
+`examples/research.ollama.json` selects a local endpoint and India-oriented news queries. Adjust model names to your machine. Local AI has RAM and compute costs and may be slow; model quality and Indian-market coverage need validation. Upstream has substantial dependencies. Base demo installation does not install them.
+
+The output is saved to `reports/research.json` with analysis date, generation time, original reports, research rating, missing-report flags, and local risk objections. Citations remain inside upstream reports. **Citation completeness, factual correctness, news coverage and price freshness are not independently verified by this version.** An empty report forces REVIEW; a nonempty report is not proof of adequate evidence. No recommendation automatically buys a stock. No cross-stock ranking is implemented yet.
+
+## Local paper protection
+
+Review `examples/limits.json` before testing. Its values are demo settings, not recommended personal risk limits. Monetary values share one account currency (default intent: INR); the simulator does not perform currency conversion.
+
+| Setting | Demo value |
+|---|---:|
+| Starting paper cash | 100000 |
+| Maximum value per position | 10000 |
+| Planned maximum loss per trade | 200 |
+| Daily loss threshold for blocking entries | 500 |
+| Quote age limit | 60 seconds |
+| Assumed slippage | 10 basis points per fill |
+| Assumed fee | 2 per order |
+
+Fees are a simplified placeholder; Indian taxes, exchange charges and broker-specific charges are not modeled. Daily entry checks use today's realized P&L plus current marked open P&L. Positions are marked only when you supply a quote. Daily buckets use Asia/Kolkata. This is not a start-of-day equity drawdown model. Entries are long-only, one position per symbol, without averaging down or leverage.
+
+Supply a fresh, timezone-aware quote timestamp. In Bash:
+
+```bash
+QUOTE_TIME=$(python -c 'from datetime import datetime,timezone; print(datetime.now(timezone.utc).isoformat())')
+stock-pilot paper-buy RELIANCE.NS --quantity 1 --price 100 --stop 95 --trailing-pct 3 --timestamp "$QUOTE_TIME" --request-id trial-entry-001
+stock-pilot status
+```
+
+Prices above are fabricated examples, not current RELIANCE prices. Then simulate an adverse quote:
+
+```bash
+QUOTE_TIME=$(python -c 'from datetime import datetime,timezone; print(datetime.now(timezone.utc).isoformat())')
+stock-pilot paper-tick RELIANCE.NS --price 94 --timestamp "$QUOTE_TIME" --request-id trial-tick-001
+stock-pilot status
+```
+
+A unique request ID makes retries return the original result rather than repeat a fill. Use a new ID for each new action. Reusing an ID returns its original action even if you change parameters. SQLite transactions protect cash and position updates; the ledger persists in `paper.db`.
+
+```bash
+stock-pilot pause
+stock-pilot resume
+```
+
+Pause blocks new entries. Protection remains active **when you supply paper ticks**. This version has no continuous market watcher or background automation. Stops are local simulated rules, not broker-hosted stop orders. Daily loss rules block new entries; they do not liquidate every holding.
+
+## OpenAlgo connection check
+
+Run your own [OpenAlgo](https://github.com/marketcalls/openalgo) installation and enable Analyzer Mode in its interface. Set the URL and API key in your shell; never commit keys.
+
+```bash
+export OPENALGO_URL=http://127.0.0.1:5000
+read -rs -p 'OpenAlgo API key: ' OPENALGO_API_KEY
+export OPENALGO_API_KEY
+stock-pilot openalgo-check
+```
+
+Remote endpoints require HTTPS. The check refuses an unconfirmed or disabled analyzer mode. It never switches modes and has no order submission function. The local paper ledger is independent of OpenAlgo's sandbox. OpenAlgo market data may require broker credentials and data entitlements.
+
+## Performance reports
+
+[QuantStats](https://github.com/ranaroussi/quantstats) is an optional report integration:
+
+```bash
+python -m pip install -e '.[reports]'
+stock-pilot report examples/net_returns.csv --output reports/performance.html
+```
+
+The sample CSV is fabricated. Supply sorted, unique dates and decimal periodic returns (`0.01` means 1%), already net of actual fees and slippage. Optional `benchmark` contains benchmark returns on the same dates. The ledger does not yet produce a time-series equity curve automatically.
+
+## Verification
+
+```bash
+python -m unittest discover -s tests -v
+```
+
+Tests cover gap losses, stop/trailing exits, fees, daily entry blocking, duplicate actions, persistence, pause behavior, invalid and stale prices, out-of-order ticks, the upstream adapter contract, and OpenAlgo mode verification. Mocked integrations do not establish live compatibility.
+
+## Next implementation gates
+
+- Validate upstream installation, local-model tool calling, and Indian company/news coverage on the target server.
+- Verify sources and publication times independently; keep unverified research out of actionable recommendations.
+- Add a conversational Manager and watchlist ranking with user-defined investment timeframes.
+- Add continuous paper-data monitoring, portfolio-wide exposure limits, and proper net equity history.
+- Backtest on unseen data with Indian costs, then test broker sandbox execution including partial fills and reconnects.
+- Only after broker selection, explicit limits, authorization and validation: implement live execution, broker-side protection and reconciliation.
+
+No real money was connected or traded while building v0.1.
