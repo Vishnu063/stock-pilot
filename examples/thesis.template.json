@@ -1,0 +1,20 @@
+{
+  "symbol": "EXAMPLE.NS",
+  "rationale": "REPLACE with the evidence-supported investment rationale",
+  "holding_days": 30,
+  "review_at": "2026-11-01T12:00:00+05:30",
+  "max_fact_age_days": 120,
+  "invalidation_rules": [
+    {
+      "metric": "revenue_growth_pct",
+      "operator": "lt",
+      "threshold": "0"
+    }
+  ],
+  "events": [
+    {
+      "name": "REPLACE with a verified event",
+      "at": "2026-10-25T12:00:00+05:30"
+    }
+  ]
+}

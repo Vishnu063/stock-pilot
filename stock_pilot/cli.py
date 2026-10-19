@@ -34,8 +34,43 @@ def main(argv=None):
     parser.add_argument("--costs", help="Reviewed itemized cost schedule JSON")
     parser.add_argument("--limits", default="examples/limits.json")
     sub = parser.add_subparsers(dest="command", required=True)
-    for cmd in ("demo", "team", "status", "pause", "resume", "openalgo-check"):
+    for cmd in (
+        "demo",
+        "team",
+        "status",
+        "pause",
+        "resume",
+        "openalgo-check",
+        "agency-demo",
+    ):
         sub.add_parser(cmd)
+    r = sub.add_parser("agency")
+    r.add_argument("job")
+    r.add_argument("--run-id", required=True)
+    r.add_argument("--output-dir", default="reports/agency")
+    r.add_argument("--lease-seconds", type=int, default=3600)
+    r = sub.add_parser("agency-status")
+    r.add_argument("run_id", nargs="?")
+    r = sub.add_parser("evaluate-model")
+    r.add_argument("--model", default="qwen3:4b")
+    r.add_argument("--output", default="reports/model-evaluation.json")
+    r = sub.add_parser("backtest-suite")
+    r.add_argument("manifest")
+    r.add_argument("--output", default="reports/evaluation-suite.json")
+    r = sub.add_parser("reconcile")
+    r.add_argument("expected")
+    r.add_argument("observed")
+    r.add_argument("--max-age-seconds", type=int, default=60)
+    r.add_argument("--pause-on-mismatch", action="store_true")
+    r = sub.add_parser("thesis")
+    thesis_sub = r.add_subparsers(dest="thesis_command", required=True)
+    t = thesis_sub.add_parser("add")
+    t.add_argument("definition")
+    t.add_argument("--id", required=True)
+    thesis_sub.add_parser("list")
+    t = thesis_sub.add_parser("review")
+    t.add_argument("thesis_id")
+    t.add_argument("facts")
     r = sub.add_parser("chat")
     r.add_argument("message", nargs="?")
     r.add_argument("--reports-dir", default="reports")
@@ -103,6 +138,18 @@ def main(argv=None):
     try:
         if args.command == "demo":
             result = demo()
+        elif args.command == "agency-demo":
+            from .agency import demo as agency_demo
+
+            result = agency_demo()
+        elif args.command == "evaluate-model":
+            from .model_eval import evaluate as evaluate_model
+
+            result = evaluate_model(args.model)
+            Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+            Path(args.output).write_text(json.dumps(result, indent=2))
+            print(json.dumps(result, indent=2))
+            return 0 if result["passed"] == result["total"] else 1
         elif args.command == "team":
             result = ROLES
         elif args.command == "attach-evidence":
@@ -152,7 +199,79 @@ def main(argv=None):
             broker = PaperBroker(
                 args.db, limits, cost_schedule=schedule, instruments=instruments
             )
-            if args.command == "backtest":
+            if args.command == "agency":
+                from .agency import run
+
+                job = json.loads(Path(args.job).read_text())
+                result = run(
+                    broker,
+                    job,
+                    args.run_id,
+                    args.output_dir,
+                    lease_seconds=args.lease_seconds,
+                )
+                if result["status"] == "failed":
+                    print(json.dumps(result, indent=2))
+                    return 1
+            elif args.command == "agency-status":
+                from .agency import status as agency_status
+
+                result = agency_status(broker, args.run_id)
+            elif args.command == "thesis":
+                from .thesis import create, list_theses, review
+
+                if args.thesis_command == "add":
+                    result = create(
+                        broker, args.id, json.loads(Path(args.definition).read_text())
+                    )
+                elif args.thesis_command == "review":
+                    result = review(
+                        broker, args.thesis_id, json.loads(Path(args.facts).read_text())
+                    )
+                else:
+                    result = list_theses(broker)
+            elif args.command == "backtest-suite":
+                if schedule is None:
+                    raise ValueError(
+                        "Evaluation suites require an explicit historical cost schedule"
+                    )
+                from .evaluation_suite import evaluate_suite
+                from .journal import append, evaluated_datasets
+
+                result = evaluate_suite(
+                    json.loads(Path(args.manifest).read_text()), schedule
+                )
+                history = evaluated_datasets(broker.db)
+                for job in result["jobs"]:
+                    if job["status"] == "completed":
+                        job["result"]["previous_runs_on_same_dataset"] = history.get(
+                            job["result"]["dataset_sha256"], 0
+                        )
+                with broker.transaction():
+                    append(broker.db, "BACKTEST_SUITE", result)
+                Path(args.output).parent.mkdir(parents=True, exist_ok=True)
+                Path(args.output).write_text(json.dumps(result, indent=2))
+                if result["failed_jobs"]:
+                    print(json.dumps(result, indent=2))
+                    return 1
+            elif args.command == "reconcile":
+                from .reconciliation import FileSnapshotSource, reconcile
+                from .journal import append
+
+                expected, expected_hash = FileSnapshotSource(args.expected).read()
+                observed, observed_hash = FileSnapshotSource(args.observed).read()
+                result = reconcile(expected, observed, args.max_age_seconds)
+                result.update(
+                    expected_sha256=expected_hash, observed_sha256=observed_hash
+                )
+                with broker.transaction():
+                    append(broker.db, "RECONCILIATION", result)
+                if args.pause_on_mismatch and result["entries_should_be_blocked"]:
+                    broker.pause(True)
+                if result["entries_should_be_blocked"]:
+                    print(json.dumps(result, indent=2))
+                    return 1
+            elif args.command == "backtest":
                 if schedule is None:
                     raise ValueError(
                         "Backtesting requires an explicit itemized historical cost schedule"
@@ -164,15 +283,12 @@ def main(argv=None):
                 )
                 Path(args.output).parent.mkdir(parents=True, exist_ok=True)
                 Path(args.output).write_text(json.dumps(result, indent=2))
-                from .journal import append, entries
+                from .journal import append, evaluated_datasets
 
-                previous_runs = [
-                    r
-                    for r in entries(broker.db)
-                    if r["kind"] == "BACKTEST"
-                    and r["payload"].get("dataset_sha256") == result["dataset_sha256"]
-                ]
-                result["previous_runs_on_same_dataset"] = len(previous_runs)
+                previous_runs = evaluated_datasets(broker.db).get(
+                    result["dataset_sha256"], 0
+                )
+                result["previous_runs_on_same_dataset"] = previous_runs
                 if previous_runs:
                     result["limitations"].append(
                         "This dataset has been evaluated before; do not treat it as a fresh unseen holdout"

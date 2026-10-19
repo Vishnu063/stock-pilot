@@ -1,0 +1,14 @@
+[
+  {
+    "symbol": "EXAMPLE.NS",
+    "csv": "REPLACE_WITH_ADJUSTED_OHLC_CSV",
+    "split_date": "2025-04-01",
+    "holdout_end": "2025-06-30"
+  },
+  {
+    "symbol": "EXAMPLE.NS",
+    "csv": "REPLACE_WITH_ADJUSTED_OHLC_CSV",
+    "split_date": "2025-07-01",
+    "holdout_end": "2025-09-30"
+  }
+]

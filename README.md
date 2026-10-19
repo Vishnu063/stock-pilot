@@ -1,7 +1,7 @@
 # Stock Pilot
 
 Five roles working toward evidence-based stock research and controlled automation.
-**v0.4 is a research and local paper-trading system. It cannot place live orders.**
+**v0.5 is a research and local paper-trading system. It cannot place live orders.**
 Profit is an objective, never a promise. Stops can lose more than their planned amount during price gaps.
 
 ## Start in one command
@@ -28,6 +28,14 @@ stock-pilot status
 
 On Windows, activate with `.venv\Scripts\Activate.ps1` in PowerShell.
 Commands below also work as `python -m stock_pilot.cli ...` without installing the base package.
+
+## Run the agency offline
+
+```bash
+python -m stock_pilot.cli agency-demo
+```
+
+This shows all five role outputs using synthetic inputs. It correctly concludes `NO_TRADE` without verified evidence and configured policy. See [the agency workflow](docs/AGENCY_WORKFLOW.md) for checkpointed research jobs, Qwen evaluation, thesis reviews, multi-stock evaluation and read-only broker reconciliation.
 
 ## Your five roles
 
@@ -208,6 +216,8 @@ Tests cover gap losses, stop/trailing exits, fees, daily entry blocking, duplica
 v0.4 adds source snapshots, itemized costs, chronological holdout evaluation, sector/related-holdings caps, persisted marked-equity drawdown checks, deterministic `NO_TRADE` assessments, and a local decision/outcome journal.
 
 Follow [the six-step research workflow](docs/RESEARCH_WORKFLOW.md) for commands, required inputs and limitations. Synthetic examples and passing tests do not establish a tradable edge.
+
+v0.5 also adds sequential agency coordination with durable steps and current-risk revalidation, five synthetic local-model evaluation tasks, immutable investment theses and reviews, disjoint-period evaluation suites, and normalized broker-export reconciliation. The reconciliation module is not a live broker connection.
 
 ## Next implementation gates
 

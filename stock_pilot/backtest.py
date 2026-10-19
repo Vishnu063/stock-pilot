@@ -159,8 +159,14 @@ def evaluate(
     slippage_bps="10",
     stop_pct="5",
     benchmark_path=None,
+    holdout_end=None,
 ):
     bars, digest = load_bars(path)
+    if holdout_end is not None:
+        end = date.fromisoformat(holdout_end)
+        if end < date.fromisoformat(split_date):
+            raise ValueError("Holdout end precedes split date")
+        bars = [bar for bar in bars if bar["date"] <= end]
     candidates = candidates or [(5, 20), (10, 30)]
     if len(candidates) > 10:
         raise ValueError("At most ten declared training trials")
@@ -223,6 +229,7 @@ def evaluate(
         "benchmark_reference": benchmark,
         "dataset_sha256": digest,
         "split_date": split_date,
+        "holdout_end": bars[-1]["date"].isoformat(),
         "training_trials": trials,
         "selected_on_training_only": {"fast": chosen["fast"], "slow": chosen["slow"]},
         "holdout": test,

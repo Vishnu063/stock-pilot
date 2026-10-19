@@ -155,3 +155,24 @@ def summary(db):
         "observations": sum(r["kind"] == "OBSERVATION" for r in rows),
         "note": "Local paper fills only; excludes open P&L. Observations are not counted as realized profits.",
     }
+
+
+def evaluated_datasets(db):
+    """Count previously reported evaluations across individual and suite commands."""
+    counts = {}
+    for row in entries(db):
+        if row["kind"] == "BACKTEST":
+            results = [row["payload"]]
+        elif row["kind"] == "BACKTEST_SUITE":
+            results = [
+                job["result"]
+                for job in row["payload"].get("jobs", [])
+                if job.get("status") == "completed"
+            ]
+        else:
+            continue
+        for result in results:
+            digest = result.get("dataset_sha256")
+            if digest:
+                counts[digest] = counts.get(digest, 0) + 1
+    return counts

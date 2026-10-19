@@ -30,3 +30,12 @@ The sequential upgrades add local source integrity/date checks, configurable ite
 The current suite passes 58 tests, including source tampering, future publications, domain spoofing, itemized fee/cash reconciliation, holdout isolation, prior-close signal timing, concentration/drawdown blocking, assessment non-execution, audit modification detection, counterfactual outcome labeling and v0.3 database migration.
 
 Recorded user constraints: days-to-months holding style, 8 GB target server and broker undecided. Capital and personal risk limits remain unset. No live orders are implemented.
+
+
+# v0.5 agency integration
+
+The current automated suite passes 79 tests. Added tests cover checkpoint recovery, crash-after-final-commit idempotency, changed-input rejection, active leases, current Manager eligibility after a pause, refusing stale fallback after a quote failure, synthetic model-scoring checks, thesis invalidation/stale facts, disjoint evaluation periods, retained failed jobs, partial fills, unconfirmed orders, rejected protection, duplicate IDs, outstanding entries, account mismatch and oversell coverage.
+
+The actual local-model evaluation command was attempted. Ollama was unreachable; all five requests returned connection errors. No claim about Qwen answer quality or financial readiness follows from that result. Full live research, market-data availability, target-server memory/latency and authenticated broker reconciliation remain unverified.
+
+All coordination, fills used in tests, thesis observations and exported broker snapshots were synthetic. The coordinator has no order-submission path. The broker integration is a normalized read-only file interface pending broker selection.

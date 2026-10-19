@@ -1,0 +1,24 @@
+{
+  "account_id": "REPLACE_WITH_ACCOUNT_IDENTIFIER",
+  "positions": [
+    {
+      "instrument": "NSE:EXAMPLE:CNC",
+      "quantity": 1
+    }
+  ],
+  "orders": [
+    {
+      "client_id": "example-stop",
+      "broker_order_id": "example-broker-id",
+      "instrument": "NSE:EXAMPLE:CNC",
+      "side": "SELL",
+      "quantity": 1,
+      "filled_quantity": 0,
+      "status": "OPEN",
+      "purpose": "PROTECTION",
+      "order_type": "STOP",
+      "trigger_price": "95"
+    }
+  ],
+  "require_protection": true
+}

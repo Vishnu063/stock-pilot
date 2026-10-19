@@ -1,0 +1,9 @@
+{
+  "symbol": "EXAMPLE.NS",
+  "observed_at": "REPLACE_WITH_SOURCE_OBSERVATION_TIME",
+  "source_reviewed": false,
+  "metrics": {
+    "revenue_growth_pct": "5"
+  },
+  "warning": "Synthetic values; replace with reviewed observations."
+}

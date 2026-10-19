@@ -138,6 +138,9 @@ class Manager:
             return self.broker.pause(True)
         if text in ("resume", "resume trading"):
             return self.broker.pause(False)
+        if text in ("agency status", "show agency runs"):
+            from .agency import status
+            return {"agency_runs": status(self.broker)}
         if text in ("performance", "show performance", "show results"):
             from .journal import summary
 
