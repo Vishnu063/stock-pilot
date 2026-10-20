@@ -122,6 +122,8 @@ def main(argv=None):
     r.add_argument("report")
     r.add_argument("manifest")
     r.add_argument("--output", required=True)
+    r = sub.add_parser("data-check")
+    r.add_argument("csv")
     r = sub.add_parser("backtest")
     r.add_argument("csv")
     r.add_argument("--split-date", required=True)
@@ -184,6 +186,14 @@ def main(argv=None):
             ):
                 print(json.dumps(result, indent=2))
                 return 1
+        elif args.command == "data-check":
+            from .backtest import load_bars
+            from .data_quality import inspect_dataset
+
+            bars, digest = load_bars(args.csv)
+            result = inspect_dataset(args.csv, bars, digest)
+            print(json.dumps(result, indent=2))
+            return 0 if result["status"] == "DECLARED_CHECKS_PASSED" else 1
         elif args.command == "demo":
             result = demo()
         elif args.command == "agency-demo":

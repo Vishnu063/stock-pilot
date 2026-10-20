@@ -2,7 +2,7 @@
 
 A guided Manager for stock research and paper trading, with five coordinated roles and fixed risk checks.
 
-**v0.6 — paper only. No live broker orders.** Model and market-data quality still need validation on your server. The system does not guarantee profits.
+**v0.6.1 — paper only. No live broker orders.** Model and market-data quality still need validation on your server. The system does not guarantee profits.
 
 ## Start here
 
@@ -66,6 +66,13 @@ The separate watchdog detects missing, stalled or unhealthy paper monitoring, pa
 - [Evidence, costs, backtesting and no-trade decisions](docs/RESEARCH_WORKFLOW.md)
 - [Full command reference](docs/COMMAND_REFERENCE.md)
 - [What has and has not been validated](docs/VALIDATION.md)
+
+## Check historical data
+
+Run `python -m stock_pilot data-check bars.csv` before a backtest. Reports flag missing
+metadata, session mismatches, zero volume and large price gaps. See the
+[metadata format and limitations](docs/RESEARCH_WORKFLOW.md#historical-data-checks-v061).
+These diagnostics do not authenticate data or correct corporate actions.
 
 ## Tests
 

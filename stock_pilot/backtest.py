@@ -6,6 +6,7 @@ reported once without tuning. This is a baseline research strategy, not a profit
 
 import csv
 import hashlib
+import io
 from datetime import date
 from decimal import Decimal
 from pathlib import Path
@@ -15,7 +16,7 @@ from .risk import money, positive
 def load_bars(path):
     raw = Path(path).read_bytes()
     bars = []
-    with open(path, newline="", encoding="utf-8") as f:
+    with io.StringIO(raw.decode("utf-8-sig"), newline="") as f:
         for row in csv.DictReader(f):
             when = date.fromisoformat(row["date"])
             if when > date.today() or (bars and when <= bars[-1]["date"]):
@@ -162,6 +163,9 @@ def evaluate(
     holdout_end=None,
 ):
     bars, digest = load_bars(path)
+    from .data_quality import inspect_dataset
+
+    data_quality = inspect_dataset(path, bars, digest)
     if holdout_end is not None:
         end = date.fromisoformat(holdout_end)
         if end < date.fromisoformat(split_date):
@@ -221,11 +225,13 @@ def evaluate(
         first = mapping[bars[split]["date"]]["open"]
         last = mapping[bars[-1]["date"]]["close"]
         benchmark = {
+            "data_quality": inspect_dataset(benchmark_path, benchmark_bars, benchmark_hash),
             "dataset_sha256": benchmark_hash,
             "full_exposure_price_return": str((last - first) / first),
             "note": "Reference price series only; no dividends or fees inferred. Strategy capital allocation is reported separately.",
         }
     return {
+        "data_quality": data_quality,
         "benchmark_reference": benchmark,
         "dataset_sha256": digest,
         "split_date": split_date,

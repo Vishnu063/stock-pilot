@@ -50,3 +50,17 @@ Command-line smoke checks passed for guided startup/demo, emergency block and fa
 In a fresh validation environment, yfinance 1.7.0 was installed. Its metadata is a Mapping wrapper and its regularMarketTime is normalized to an aware datetime/Timestamp. The collector now accepts both without substituting fetch time. An actual RELIANCE.NS quote was retrieved, with source timestamp 2026-10-19T09:59:38+00:00. That price was stale at retrieval, and the current-fill freshness check correctly rejected it. This establishes compatibility and timestamp preservation for that request, not a reliable current feed.
 
 No Ollama model, target-server memory/latency, authenticated broker execution, broker-hosted protection or corporate-action handling was newly validated. Backups cover SQLite database state only, not external evidence/report/configuration/model files. The watchdog is a separate local process, not an external outage-notification service. Live order submission remains unavailable.
+
+## v0.6.1 — historical data diagnostics
+
+101 automated tests passed locally. New cases cover missing metadata in backtest
+reports, CSV checksum mismatch, missing/extra sessions, duplicate session dates,
+naive/future/pre-dataset capture times, unsupported adjustment/action declarations,
+large overnight moves, zero volume, and a read-only data-check CLI that returns a
+review status without creating an account. Python compilation and whitespace
+checks passed. CSV parsing and hashing now use the same byte snapshot.
+
+No actual exchange calendar, corporate-action feed, vendor identity, Qwen output,
+or broker execution was validated by these tests. Session and action metadata
+remain operator declarations. Existing backtests can run with NEEDS_REVIEW;
+this diagnostic status does not confer trading readiness or alter returns.

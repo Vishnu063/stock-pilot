@@ -90,3 +90,49 @@ A hash chain detects modified entries given a trusted checkpoint. A local admini
 ## User constraints
 
 Days-to-months positions, 8 GB target server, broker undecided. Qwen is configured through Ollama. Run research jobs sequentially and configure one loaded model/parallel request on the Ollama server if memory is constrained. Target-machine resource usage remains unverified. Capital, personal loss limits and live authorization are unset.
+
+## Historical data checks (v0.6.1)
+
+Before evaluating a CSV, run:
+
+```bash
+python -m stock_pilot data-check bars.csv
+```
+
+This command needs no costs, model or paper account. Exit code 1 means review is
+needed (or the input is invalid); 0 means declared checks passed, never trading
+permission. Backtest reports automatically include `data_quality` for both the
+stock and an optional benchmark. Existing CSV-only backtests still run, explicitly
+marked `NEEDS_REVIEW`; diagnostics do not change their simulated returns.
+
+An optional `bars.csv.metadata.json` describes the **complete CSV**, including
+warmup/training dates, even when a shorter holdout end is requested:
+
+```json
+{
+  "schema_version": 1,
+  "dataset_sha256": "REPLACE_WITH_SHA256_OF_EXACT_CSV_BYTES",
+  "symbol": "RELIANCE.NS",
+  "currency": "INR",
+  "source_url": "https://example.com/replace-with-actual-source",
+  "captured_at": "2026-10-20T10:00:00+00:00",
+  "price_basis": "raw",
+  "corporate_actions_reviewed": false,
+  "corporate_actions": [],
+  "expected_sessions": ["2025-01-02", "2025-01-03"]
+}
+```
+
+Supply the actual exchange sessions for the whole file, including exceptional
+sessions and holidays. No weekday-only calendar is inferred. The checksum can be
+obtained with `sha256sum bars.csv`. A checksum mismatch, invalid capture time, or
+invalid metadata stops evaluation. Missing/extra sessions, zero-volume bars and
+absolute overnight moves over 25% require review. A large move may be real; this
+threshold is diagnostic, not an exchange price limit.
+
+Only raw bars with an explicitly reviewed declaration of no corporate actions
+can pass these declared checks. Adjusted prices or declared actions require review
+because this simulator does not implement their cash/share accounting. Do not
+label adjusted bars as raw or remove actions to clear a warning. These declarations
+are not authenticated by the program, and neither source authenticity nor
+survivorship bias is established. It performs no automatic price correction.
