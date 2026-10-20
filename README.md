@@ -2,7 +2,7 @@
 
 A guided Manager for stock research and paper trading, with five coordinated roles and fixed risk checks.
 
-**v0.6.1 — paper only. No live broker orders.** Model and market-data quality still need validation on your server. The system does not guarantee profits.
+**v0.6.2 — paper only. No live broker orders.** Model and market-data quality still need validation on your server. The system does not guarantee profits.
 
 ## Start here
 
@@ -73,6 +73,10 @@ Run `python -m stock_pilot data-check bars.csv` before a backtest. Reports flag 
 metadata, session mismatches, zero volume and large price gaps. See the
 [metadata format and limitations](docs/RESEARCH_WORKFLOW.md#historical-data-checks-v061).
 These diagnostics do not authenticate data or correct corporate actions.
+
+Backtests now cap aggregate daily fills at 1% of reported volume by default, retain
+partial/unfilled orders, and report any unsold holdings at the test end. This is a
+daily-bar approximation, not a broker or exchange execution model.
 
 ## Tests
 

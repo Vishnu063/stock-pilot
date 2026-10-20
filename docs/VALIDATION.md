@@ -64,3 +64,16 @@ No actual exchange calendar, corporate-action feed, vendor identity, Qwen output
 or broker execution was validated by these tests. Session and action metadata
 remain operator declarations. Existing backtests can run with NEEDS_REVIEW;
 this diagnostic status does not confer trading readiness or alter returns.
+
+## v0.6.2 — volume-limited historical simulation
+
+109 tests passed locally. Eight new tests exercise zero-volume rejection, partial
+entry cancellation, shared entry/stop volume capacity, multi-bar partial exit
+recovery after a rebound, proportional fee and realized-P&L accounting, final
+unsold holdings/equity returns, aggregate daily capacity and invalid participation
+fractions, plus the documented module CLI entry point. Existing backtest training/holdout tests continue to pass. Compilation
+and whitespace checks passed.
+
+These are synthetic mechanical tests. The 1% default is not empirically calibrated.
+Daily volume provides an ex-post cap and does not establish intraday liquidity;
+no exchange/broker behavior, circuit limits or actual fills have been validated.

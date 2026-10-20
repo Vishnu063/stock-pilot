@@ -51,7 +51,11 @@ def simulate(
     slippage_bps="10",
     stop_pct="5",
     buy_hold=False,
+    max_volume_fraction="0.01",
 ):
+    participation = positive(max_volume_fraction)
+    if participation > 1:
+        raise ValueError("Volume participation must be in (0, 1]")
     capital = positive(capital)
     allocation = positive(allocation)
     slippage = money(slippage_bps)
@@ -73,45 +77,61 @@ def simulate(
     equity = []
     closed = 0
     wins = 0
+    position_pnl = Decimal(0)
+    exit_pending = False
+    capacity = 0
+    orders = []
 
-    def trade(side, price, qty, bar, reason):
-        nonlocal cash, shares, entry, entry_fee, closed, wins
+    def trade(side, price, requested, bar, reason):
+        nonlocal cash, shares, entry, entry_fee, closed, wins, capacity, position_pnl
+        qty = min(requested, capacity)
+        orders.append({
+            "date": bar["date"].isoformat(), "side": side, "reason": reason,
+            "requested_quantity": requested, "filled_quantity": qty,
+            "unfilled_quantity": requested - qty,
+            "status": "FILLED" if qty == requested else "PARTIAL" if qty else "UNFILLED",
+        })
+        if not qty:
+            return
+        capacity -= qty
         fill = price * (1 + slippage / 10000 if side == "BUY" else 1 - slippage / 10000)
-        costs = money(
-            schedule.calculate(fill, qty, side, bar["date"].isoformat())["total"]
-        )
+        costs = money(schedule.calculate(fill, qty, side, bar["date"].isoformat())["total"])
         if side == "BUY":
             cash -= fill * qty + costs
             shares = qty
             entry = fill
             entry_fee = costs
+            position_pnl = Decimal(0)
             pnl = None
         else:
+            allocated_entry_fee = entry_fee * qty / shares
             cash += fill * qty - costs
-            pnl = (fill - entry) * qty - entry_fee - costs
-            shares = 0
-            closed += 1
-            wins += int(pnl > 0)
-        events.append(
-            {
-                "date": bar["date"].isoformat(),
-                "side": side,
-                "fill": str(fill),
-                "quantity": qty,
-                "fees": str(costs),
-                "reason": reason,
-                "net_pnl": str(pnl) if pnl is not None else None,
-            }
-        )
+            pnl = (fill - entry) * qty - allocated_entry_fee - costs
+            entry_fee -= allocated_entry_fee
+            shares -= qty
+            position_pnl += pnl
+            if not shares:
+                closed += 1
+                wins += int(position_pnl > 0)
+        events.append({
+            "date": bar["date"].isoformat(), "side": side, "fill": str(fill),
+            "quantity": qty, "fees": str(costs), "reason": reason,
+            "net_pnl": str(pnl) if pnl is not None else None,
+        })
 
     for i in range(start, end):
         bar = bars[i]
+        # Whole-day volume is an ex-post capacity bound, not opening liquidity.
+        capacity = int(bar["volume"] * participation)
+        exited_today = False
         # Excludes today's close entirely. Signal known before today's opening auction.
         past = [b["close"] for b in bars[i - slow : i]]
         want_long = buy_hold or (sum(past[-fast:]) / fast > sum(past) / slow)
-        if shares and not want_long:
-            trade("SELL", bar["open"], shares, bar, "prior_close_signal")
-        if not shares and want_long and (not buy_hold or i == start):
+        if shares and (exit_pending or not want_long):
+            trade("SELL", bar["open"], shares, bar, "pending_exit" if exit_pending else "prior_close_signal")
+            exit_pending = bool(shares)
+            exited_today = True
+        if not shares and not exited_today and want_long and (not buy_hold or i == start):
             estimated = bar["open"] * (1 + slippage / 10000)
             budget = min(cash, capital * allocation)
             qty = int(budget / estimated)
@@ -128,20 +148,27 @@ def simulate(
                 qty -= 1
             if qty > 0:
                 trade("BUY", bar["open"], qty, bar, "prior_close_signal")
-        if shares and not buy_hold:
+        if shares and not buy_hold and not exited_today:
             stop = entry * (1 - stop_pct / 100)
             if bar["low"] <= stop:
                 trade(
                     "SELL", min(bar["open"], stop), shares, bar, "gap_or_intrabar_stop"
                 )
+                exit_pending = bool(shares)
         if shares and i == end - 1:
             trade("SELL", bar["close"], shares, bar, "predeclared_end_liquidation")
         mark = cash + shares * bar["close"]
         peak = max(peak, mark)
         drawdown = max(drawdown, (peak - mark) / peak)
         equity.append({"date": bar["date"].isoformat(), "equity": str(mark)})
+    equity_value = cash + shares * bars[end - 1]["close"]
     return {
-        "net_return": str((cash - capital) / capital),
+        "ending_equity": str(equity_value),
+        "ending_shares": shares,
+        "unrealized_pnl": str((bars[end - 1]["close"] - entry) * shares - entry_fee) if shares else "0",
+        "orders": orders,
+        "max_volume_fraction": str(participation),
+        "net_return": str((equity_value - capital) / capital),
         "max_drawdown": str(drawdown),
         "closed_trades": closed,
         "winning_trades": wins,
@@ -161,6 +188,7 @@ def evaluate(
     stop_pct="5",
     benchmark_path=None,
     holdout_end=None,
+    max_volume_fraction="0.01",
 ):
     bars, digest = load_bars(path)
     from .data_quality import inspect_dataset
@@ -190,6 +218,7 @@ def evaluate(
         "allocation": allocation,
         "slippage_bps": slippage_bps,
         "stop_pct": stop_pct,
+        "max_volume_fraction": max_volume_fraction,
     }
     trials = []
     for fast, slow in candidates:
@@ -244,7 +273,9 @@ def evaluate(
         "costs_reviewed": schedule.reviewed,
         "execution_allowed": False,
         "limitations": [
-            "Daily-bar synthetic fills, not an exchange execution model",
+            "Daily volume participation is an ex-post bound, not opening/stop liquidity or an exchange execution model",
+            "Unfilled entries are cancelled; incomplete exits retry next bar; terminal residuals stay marked at close",
+            "No circuit-limit, queue, intraday path or market-session execution simulation",
             "Corporate actions, survivorship and source authenticity must be independently checked",
             "This fixed holdout becomes contaminated if used to tune later versions",
             "A single-stock result does not establish a general or profitable strategy",

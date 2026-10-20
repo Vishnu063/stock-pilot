@@ -127,6 +127,7 @@ def main(argv=None):
     r = sub.add_parser("backtest")
     r.add_argument("csv")
     r.add_argument("--split-date", required=True)
+    r.add_argument("--max-volume-fraction", default="0.01", help="Daily aggregate volume fraction in (0, 1]; ex-post approximation")
     r.add_argument(
         "--benchmark",
         help="Optional OHLC reference series CSV with matching holdout dates",
@@ -352,7 +353,8 @@ def main(argv=None):
                 from .backtest import evaluate
 
                 result = evaluate(
-                    args.csv, schedule, args.split_date, benchmark_path=args.benchmark
+                    args.csv, schedule, args.split_date, benchmark_path=args.benchmark,
+                    max_volume_fraction=args.max_volume_fraction
                 )
                 Path(args.output).parent.mkdir(parents=True, exist_ok=True)
                 Path(args.output).write_text(json.dumps(result, indent=2))

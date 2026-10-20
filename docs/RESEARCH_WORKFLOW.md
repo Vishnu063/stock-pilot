@@ -50,7 +50,7 @@ stock-pilot --costs historical-costs.json backtest bars.csv --split-date 2025-07
 
 Two declared SMA candidates, 5/20 and 10/30, are selected on training net return only. At least 30 evaluated training bars after warmup and 30 holdout bars are required. Signals use prior completed closes; entry is at the following open. A gap through the stop exits at the opening price, otherwise a crossed daily low uses the stop threshold. Final liquidation at the last evaluation close is predeclared. Fees and slippage are deducted.
 
-This is a daily-bar baseline, not an AI predictor or an exchange emulator. It does not model partial fills, circuit-limit execution, volume-limited fills or an exchange calendar. Allocation and stop defaults are demonstration assumptions. A single effective-dated cost schedule must cover the data; tariff changes inside an interval are not supported yet.
+This is a daily-bar baseline, not an AI predictor or an exchange emulator. It models volume-limited partial fills as described below, but does not model circuit-limit execution or an exchange calendar. Allocation and stop defaults are demonstration assumptions. A single effective-dated cost schedule must cover the data; tariff changes inside an interval are not supported yet.
 
 Reports retain every training trial, holdout equity/trades and a same-stock buy-and-hold baseline. An optional reference index reports full-exposure price return without inferred dividends or fees; compare allocation and definitions carefully. Repeat dataset hashes are flagged in the journal. Editing files or repeatedly trying splits can still contaminate a holdout. There is no automatic strategy promotion or retraining.
 
@@ -136,3 +136,37 @@ because this simulator does not implement their cash/share accounting. Do not
 label adjusted bars as raw or remove actions to clear a warning. These declarations
 are not authenticated by the program, and neither source authenticity nor
 survivorship bias is established. It performs no automatic price correction.
+
+## Volume-limited simulation (v0.6.2)
+
+```bash
+python -m stock_pilot --costs historical-costs.json backtest bars.csv --split-date 2025-07-01 --max-volume-fraction 0.01
+```
+
+The default participation fraction is 0.01 (1%), an illustrative assumption, not a
+validated liquidity estimate. It must be greater than zero and at most one. Each
+bar permits at most `floor(volume * fraction)` shares **across all buys and sells**.
+Training, holdout and same-stock baseline use the same setting. Evaluation-suite
+jobs can set `max_volume_fraction`; reports retain the setting.
+
+Entry orders can fill partially; their remainder is cancelled, with no automatic
+top-up of an existing position. A signal exit or triggered stop remains pending
+until sold, even if the signal or price subsequently recovers. Remaining exit
+quantity is attempted at later bar opens with configured adverse slippage. No new
+entry occurs on a bar used to retry an exit. Every actual fill incurs the configured
+cost schedule; entry fees are allocated proportionally across partial exits.
+`closed_trades` counts fully closed positions, rather than individual exit fills.
+
+A predeclared terminal close also respects the remaining volume allowance. Unsold
+shares remain in `ending_shares`, with `ending_equity` marked at the final close.
+`net_return` is based on ending equity, not cash alone. `unrealized_pnl` includes
+remaining entry fees but does not estimate future selling costs. `orders` records
+requested, filled and unfilled quantities; `events` contains actual simulated fills.
+Repeated attempts are separate orders, not additional completed positions.
+
+Daily volume is known only after the session: it is used as an **ex-post capacity
+bound**, never as a strategy signal. It cannot establish opening, stop-price or
+closing liquidity. Prices are synthetic slipped prices, with no quote/queue or
+intraday-path model. Missing sessions, suspensions, circuit limits, corporate
+actions, broker behavior and liquidity at a particular moment remain unmodeled.
+No live or paper-account order code is changed by this backtest feature.

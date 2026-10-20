@@ -31,6 +31,7 @@ def evaluate_suite(jobs, schedule):
                 job["split_date"],
                 benchmark_path=job.get("benchmark"),
                 holdout_end=job["holdout_end"],
+                max_volume_fraction=job.get("max_volume_fraction", "0.01"),
             )
             results.append(
                 {"symbol": job["symbol"], "status": "completed", "result": result}
