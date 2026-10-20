@@ -8,3 +8,6 @@ __pycache__/
 reports/
 build/
 dist/
+
+# Local paper profiles, account data and backups
+data/

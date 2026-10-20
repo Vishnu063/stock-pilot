@@ -26,6 +26,18 @@ def demo():
 
 
 def main(argv=None):
+    from .console import require_paper_mode
+
+    try:
+        require_paper_mode()
+    except ValueError as exc:
+        print(str(exc), file=sys.stderr)
+        return 1
+    arguments = list(sys.argv[1:] if argv is None else argv)
+    if not arguments:
+        from .console import main as guided_main
+
+        return guided_main([])
     parser = argparse.ArgumentParser(
         description="Stock Pilot Manager — research and local paper trading"
     )
@@ -44,6 +56,22 @@ def main(argv=None):
         "agency-demo",
     ):
         sub.add_parser(cmd)
+    r = sub.add_parser("menu")
+    r.add_argument("--home", default="data")
+    r = sub.add_parser("backup")
+    r.add_argument("--output", required=True)
+    r = sub.add_parser("restore")
+    r.add_argument("backup")
+    r.add_argument("--output", required=True)
+    r = sub.add_parser("emergency-stop")
+    r.add_argument("--reason", required=True)
+    r = sub.add_parser("unlock-entries")
+    r.add_argument("--reason", required=True)
+    r = sub.add_parser("watchdog")
+    r.add_argument("--alerts", default="reports/alerts.jsonl")
+    r.add_argument("--interval", type=float, default=5)
+    r.add_argument("--cycles", type=int)
+    r.add_argument("--max-heartbeat-age", type=int, default=90)
     r = sub.add_parser("agency")
     r.add_argument("job")
     r.add_argument("--run-id", required=True)
@@ -134,9 +162,29 @@ def main(argv=None):
     r = sub.add_parser("report")
     r.add_argument("csv")
     r.add_argument("--output", default="reports/performance.html")
-    args = parser.parse_args(argv)
+    args = parser.parse_args(arguments)
     try:
-        if args.command == "demo":
+        if args.command == "menu":
+            from .console import main as guided_main
+
+            return guided_main(["--home", args.home])
+        elif args.command == "restore":
+            from .storage import restore
+
+            result = restore(args.backup, args.output)
+        elif args.command == "watchdog":
+            from .health import supervise
+
+            result = supervise(
+                args.db, args.alerts, args.interval, args.cycles, args.max_heartbeat_age
+            )
+            if (
+                args.cycles is not None
+                and result.get("last_health", {}).get("status") == "CRITICAL"
+            ):
+                print(json.dumps(result, indent=2))
+                return 1
+        elif args.command == "demo":
             result = demo()
         elif args.command == "agency-demo":
             from .agency import demo as agency_demo
@@ -196,10 +244,25 @@ def main(argv=None):
                 if args.instruments
                 else None
             )
+            if (
+                args.command in ("backup", "emergency-stop", "unlock-entries")
+                and not Path(args.db).is_file()
+            ):
+                raise ValueError(
+                    "Select an existing paper account with --db; no account was created"
+                )
             broker = PaperBroker(
                 args.db, limits, cost_schedule=schedule, instruments=instruments
             )
-            if args.command == "agency":
+            if args.command == "backup":
+                from .storage import backup
+
+                result = backup(broker, args.output)
+            elif args.command == "emergency-stop":
+                result = broker.emergency_block(args.reason)
+            elif args.command == "unlock-entries":
+                result = broker.clear_entry_block(args.reason)
+            elif args.command == "agency":
                 from .agency import run
 
                 job = json.loads(Path(args.job).read_text())

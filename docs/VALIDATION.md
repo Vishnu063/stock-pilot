@@ -39,3 +39,14 @@ The current automated suite passes 79 tests. Added tests cover checkpoint recove
 The actual local-model evaluation command was attempted. Ollama was unreachable; all five requests returned connection errors. No claim about Qwen answer quality or financial readiness follows from that result. Full live research, market-data availability, target-server memory/latency and authenticated broker reconciliation remain unverified.
 
 All coordination, fills used in tests, thesis observations and exported broker snapshots were synthetic. The coordinator has no order-submission path. The broker integration is a normalized read-only file interface pending broker selection.
+
+
+# v0.6 guided usability and recovery
+
+The automated suite passes 93 tests. New cases cover menu/demo isolation, actionable setup text, rejecting live profiles before creating files, persistent emergency blocks, protective paper exits while entry-blocked, reviewed unlock behavior, database/ledger preservation after restore, refusing corrupt backups or existing restore targets, WAL-backed committed snapshots, watchdog missing-database behavior, alert deduplication, recent in-progress collection, lazy metadata mappings and timezone-aware source market timestamps.
+
+Command-line smoke checks passed for guided startup/demo, emergency block and failed ordinary resume, verified backup/restore into a new locked copy, missing-account watchdog diagnostics, and live-mode rejection. Static undefined/unused-name checks and bytecode compilation passed.
+
+In a fresh validation environment, yfinance 1.7.0 was installed. Its metadata is a Mapping wrapper and its regularMarketTime is normalized to an aware datetime/Timestamp. The collector now accepts both without substituting fetch time. An actual RELIANCE.NS quote was retrieved, with source timestamp 2026-10-19T09:59:38+00:00. That price was stale at retrieval, and the current-fill freshness check correctly rejected it. This establishes compatibility and timestamp preservation for that request, not a reliable current feed.
+
+No Ollama model, target-server memory/latency, authenticated broker execution, broker-hosted protection or corporate-action handling was newly validated. Backups cover SQLite database state only, not external evidence/report/configuration/model files. The watchdog is a separate local process, not an external outage-notification service. Live order submission remains unavailable.

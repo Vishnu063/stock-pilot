@@ -50,6 +50,10 @@ class PaperBroker:
             row[1] for row in self.db.execute("PRAGMA table_info(account)")
         }:
             self.db.execute("ALTER TABLE account ADD COLUMN peak_equity TEXT")
+        if "entry_lock" not in {
+            row[1] for row in self.db.execute("PRAGMA table_info(account)")
+        }:
+            self.db.execute("ALTER TABLE account ADD COLUMN entry_lock TEXT")
         from .journal import initialize
 
         initialize(self.db)
@@ -186,6 +190,7 @@ class PaperBroker:
             "mode": "local_paper",
             "cash": account["cash"],
             "paused": bool(account["paused"]),
+            "entry_lock": account.get("entry_lock"),
             "positions": positions,
             "realized_today": str(realized),
             "open_pnl": str(unrealized),
@@ -215,6 +220,8 @@ class PaperBroker:
             qty = quantity(qty)
             price = self.limits.fill(self.limits.quote(price, timestamp), "BUY")
             status = self.status()
+            if status.get("entry_lock"):
+                raise ValueError("New entries are locked: " + status["entry_lock"])
             if status["paused"]:
                 raise ValueError("Manager paused new entries")
             if any(p["symbol"] == symbol for p in status["positions"]):
@@ -354,8 +361,38 @@ class PaperBroker:
             self.update_peak()
             return result
 
+    def emergency_block(self, reason):
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("A reason is required")
+        with self.transaction():
+            self.db.execute(
+                "UPDATE account SET paused=1,entry_lock=? WHERE id=1", (reason,)
+            )
+            self.event("EMERGENCY_ENTRY_BLOCK", {"reason": reason})
+        return {
+            "entries_locked": True,
+            "reason": reason,
+            "protective_exits_enabled": True,
+        }
+
+    def clear_entry_block(self, reason):
+        if not isinstance(reason, str) or not reason.strip():
+            raise ValueError("Explain the review before clearing an entry block")
+        with self.transaction():
+            self.db.execute("UPDATE account SET entry_lock=NULL,paused=1 WHERE id=1")
+            self.event("ENTRY_BLOCK_CLEARED", {"review_reason": reason})
+        return {
+            "entries_locked": False,
+            "paused": True,
+            "next": "Entries remain paused; resume explicitly after review",
+        }
+
     def pause(self, paused):
         with self.transaction():
+            if not paused and self.status().get("entry_lock"):
+                raise ValueError(
+                    "Emergency entry block is active; review and clear it first"
+                )
             current = bool(
                 self.db.execute("SELECT paused FROM account WHERE id=1").fetchone()[0]
             )

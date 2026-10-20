@@ -23,6 +23,21 @@ class MarketTests(unittest.TestCase):
         self.assertEqual(datetime.fromisoformat(q['timestamp']).timestamp(), 1792450000)
         self.assertNotEqual(q['timestamp'], q['fetched_at'])
 
+    def test_lazy_mapping_metadata_is_accepted(self):
+        from types import MappingProxyType
+        result = quote_from_metadata('TEST.NS', MappingProxyType(self.metadata))
+        self.assertEqual(result['price'], '100')
+
+    def test_aware_datetime_market_time_is_preserved(self):
+        metadata = dict(self.metadata)
+        source = datetime.fromtimestamp(metadata['regularMarketTime'], timezone.utc)
+        metadata['regularMarketTime'] = source
+        quote = quote_from_metadata('TEST.NS', metadata)
+        self.assertEqual(datetime.fromisoformat(quote['timestamp']), source)
+        metadata['regularMarketTime'] = source.replace(tzinfo=None)
+        with self.assertRaises(ValueError):
+            quote_from_metadata('TEST.NS', metadata)
+
     def test_missing_time_currency_and_symbol_rejected(self):
         for field, value in (('regularMarketTime', None), ('currency', 'USD'),
                              ('symbol', 'OTHER.NS'), ('regularMarketPrice', float('nan'))):
